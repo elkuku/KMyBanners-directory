@@ -16,6 +16,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -30,8 +31,11 @@ OWN = {"elkuku/KMyBanners", "elkuku/KMyBanners-tool", "elkuku/KMyBanners-templat
 USER_AGENT = "KMyBanners-directory"
 
 
-def get(url, token=None, accept="application/vnd.github+json"):
-    """The body of a GET request, or None for 404/403/410 and network errors."""
+def get(url, token=None, accept="application/vnd.github+json", retry=True):
+    """The body of a GET request, or None for 403/404/410/422/429 and network errors.
+
+    A rate limit (429, or 403 with Retry-After) waits once, up to a minute, and tries again.
+    """
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": accept})
     if token and url.startswith(API):
         req.add_header("Authorization", f"Bearer {token}")
@@ -39,7 +43,13 @@ def get(url, token=None, accept="application/vnd.github+json"):
         with urllib.request.urlopen(req, timeout=30) as r:
             return r.read()
     except urllib.error.HTTPError as e:
-        if e.code in (403, 404, 410, 422):
+        wait = e.headers.get("Retry-After")
+        if retry and (e.code == 429 or (e.code == 403 and wait)):
+            seconds = min(int(wait) if wait and wait.isdigit() else 30, 60)
+            print(f"  {e.code}, waiting {seconds} s: {url}", file=sys.stderr)
+            time.sleep(seconds)
+            return get(url, token, accept, retry=False)
+        if e.code in (403, 404, 410, 422, 429):
             print(f"  {e.code} {url}", file=sys.stderr)
             return None
         raise
@@ -72,6 +82,9 @@ def candidates(token):
     names = {r["full_name"] for r in search("repositories", f"topic:{TOPIC}", token)}
     if token:
         hits = search("code", f'"{WORKFLOW}" path:.github/workflows', token)
+        if not hits:
+            # GitHub's code search often refuses the Actions token (429); the topic search still works
+            print("::warning::The code search found nothing or was refused; only the topic search was used.")
         names |= {h["repository"]["full_name"] for h in hits}
     else:
         print("No GH_TOKEN: skipping the code search", file=sys.stderr)
