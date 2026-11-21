@@ -13,8 +13,10 @@ Once a day (and on every push to `main`) the [Directory workflow](.github/workfl
    (GitHub's code search refuses the token of GitHub Actions);
 2. keeps the public ones that GitHub says were made from
    [KMyBanners-template](https://github.com/elkuku/KMyBanners-template), or whose `banner-page.yml` calls the tool;
-3. reads each agent's page for its title, description, preview image and agent name;
-4. writes `index.html` and `pages.json` and publishes them with GitHub Pages.
+3. leaves out pages whose agent turned the directory off in the app (`"directory": false` in the page repo's
+   `config.json`);
+4. reads each agent's page for its title, description, preview image and agent name;
+5. writes `index.html` and `pages.json` and publishes them with GitHub Pages.
 
 Private repositories can't be found, and neither can page repos whose topic `kmybanners` was removed (the daily
 run only searches by topic).

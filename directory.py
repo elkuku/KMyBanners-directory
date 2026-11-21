@@ -98,6 +98,16 @@ def calls_tool(name, token):
     return bool(body) and WORKFLOW.encode() in body
 
 
+def listed(name, token):
+    """False when the agent turned the directory off in the app: "directory": false in config.json."""
+    body = get(f"{API}/repos/{name}/contents/config.json", token, "application/vnd.github.raw+json")
+    try:
+        config = json.loads(body) if body else {}
+    except ValueError:
+        return True
+    return not (isinstance(config, dict) and config.get("directory") is False)
+
+
 def meta(page_html, prop):
     """The content of <meta property="og:…"> (either attribute order)."""
     for pattern in (rf'<meta[^>]+property="{prop}"[^>]+content="([^"]*)"',
@@ -118,6 +128,9 @@ def page_info(repo, token):
     from_template = (repo.get("template_repository") or {}).get("full_name") == TEMPLATE
     if not from_template and not calls_tool(name, token):
         print(f"  {name}: neither from the template nor calling the tool", file=sys.stderr)
+        return None
+    if not listed(name, token):
+        print(f"  {name}: left the directory (config.json)", file=sys.stderr)
         return None
     pages = api(f"/repos/{name}/pages", token) or {}
     url = https(pages.get("html_url")) or f"https://{repo['owner']['login'].lower()}.github.io/{repo['name']}/"
@@ -217,7 +230,8 @@ footer {{ margin-top: 32px; font-size: .875rem; color: var(--muted); }}
   </ul>
   <footer>
     <p>Found on GitHub {esc(now)} (UTC), every day: public repositories with the topic <code>{TOPIC}</code>, made
-      from the KMyBanners template. Also as <a href="pages.json">pages.json</a>.</p>
+      from the KMyBanners template. Also as <a href="pages.json">pages.json</a>.
+      Don't want to be listed? Turn it off in the app's settings.</p>
     <p>Want yours here? Make your page with the <a href="https://elkuku.github.io/KMyBanners/">KMyBanners app</a>.
       Source: <a href="https://github.com/elkuku/KMyBanners-directory">elkuku/KMyBanners-directory</a>.</p>
   </footer>
