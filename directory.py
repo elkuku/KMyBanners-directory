@@ -8,7 +8,8 @@ description and preview image.
 
     GH_TOKEN=... python3 directory.py site/
 
-Needs only the standard library. Without a token GitHub's code search is skipped (it needs one).
+Needs only the standard library. The code search runs only locally with a token: it needs one, and
+GitHub refuses it for the token of GitHub Actions.
 """
 import datetime
 import html
@@ -80,11 +81,11 @@ def search(kind, query, token):
 
 def candidates(token):
     names = {r["full_name"] for r in search("repositories", f"topic:{TOPIC}", token)}
-    if token:
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        # GitHub's code search refuses the Actions token (429); the topic search finds the app's pages
+        print("In GitHub Actions: skipping the code search", file=sys.stderr)
+    elif token:
         hits = search("code", f'"{WORKFLOW}" path:.github/workflows', token)
-        if not hits:
-            # GitHub's code search often refuses the Actions token (429); the topic search still works
-            print("::warning::The code search found nothing or was refused; only the topic search was used.")
         names |= {h["repository"]["full_name"] for h in hits}
     else:
         print("No GH_TOKEN: skipping the code search", file=sys.stderr)
@@ -215,8 +216,8 @@ footer {{ margin-top: 32px; font-size: .875rem; color: var(--muted); }}
 {cards}
   </ul>
   <footer>
-    <p>Found on GitHub {esc(now)} (UTC), every day: repositories with the topic <code>{TOPIC}</code> or a workflow
-      that calls the KMyBanners build, made from the template. Also as <a href="pages.json">pages.json</a>.</p>
+    <p>Found on GitHub {esc(now)} (UTC), every day: public repositories with the topic <code>{TOPIC}</code>, made
+      from the KMyBanners template. Also as <a href="pages.json">pages.json</a>.</p>
     <p>Want yours here? Make your page with the <a href="https://elkuku.github.io/KMyBanners/">KMyBanners app</a>.
       Source: <a href="https://github.com/elkuku/KMyBanners-directory">elkuku/KMyBanners-directory</a>.</p>
   </footer>
